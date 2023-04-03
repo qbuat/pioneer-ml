@@ -1,0 +1,10 @@
+*pyc
+*pynb
+*~
+*.h5
+*.parquet
+*.ps
+.DS_Store
+*.pdf
+*/__pycache__
+*.png
