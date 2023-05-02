@@ -1,3 +1,4 @@
+import ROOT
 import os
 import uproot
 import h5py
@@ -100,3 +101,35 @@ def get_array(path, folder, tree_name='sim', fields=FIELDS, debug=False, use_cac
         folder, len(_array)))
     return _array
 
+
+
+def load(name):
+    fname = "hist/tr_hist" + name + ".root"
+    if not os.path.exists(fname):
+        return None
+    
+    f = ROOT.TFile.Open(fname)
+    hist = dict()
+    for k in keys:
+        h = f.Get(name + k)
+        if h:
+            print("found: ", k, " name: ", name + k)
+            h.SetDirectory(0)
+            hist[k] = h
+        else:
+            print("not found: ", k, " name: ", name + k)
+            #if even one histo missing, read everything
+            return None
+    print("Loaded all histos for ", name)
+    f.Close()
+    return hist
+    
+def write(name, hist, cache_folder='cache'):
+    rfile_name = 'tr_hist{}.root'.format(name)
+    rfile = os.path.join(cache_folder, rfile_name)
+    f = ROOT.TFile.Open(rfile, "RECREATE")
+    for h in hist.values():
+        h.Write()
+        h.SetDirectory(0)
+    f.Close()
+    
