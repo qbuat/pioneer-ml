@@ -103,8 +103,8 @@ def get_array(path, folder, tree_name='sim', fields=FIELDS, debug=False, use_cac
 
 
 
-def load(name):
-    fname = "hist/tr_hist" + name + ".root"
+def load(name, cache_folder='cache'):
+    fname = os.path.join(cache_folder, "tr_hist{}.root".format(name))
     if not os.path.exists(fname):
         return None
     
