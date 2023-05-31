@@ -1,4 +1,8 @@
-import awkward as ak
+try:
+    import uproot
+    import awkward as ak
+except ModuleNotFoundError:
+    print("No Uproot, it's awkward")
 import numpy as np
 
 
