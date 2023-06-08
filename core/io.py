@@ -1,9 +1,12 @@
 import ROOT
 import os
-import uproot
+try:
+    import uproot
+    import awkward as ak
+except ModuleNotFoundError:
+    print("No Uproot, it's awkward")
 import h5py
 import numpy as np
-import awkward as ak
 import json
 
 from . import log; log = log.getChild(__name__)
@@ -109,6 +112,7 @@ def load(name, cache_folder='cache'):
         return None
     
     f = ROOT.TFile.Open(fname)
+    keys = f.GetListOf
     hist = dict()
     for k in keys:
         h = f.Get(name + k)

@@ -56,8 +56,8 @@ def plot_stack(
     lg.AddEntry(pimudif_0_2, "0-1 Atar Strips")
     lg.AddEntry(pimudif_3_5, "2-5 Atar Strips")
     lg.AddEntry(pimudif_6_inf, "6+ Atar Strips")
-    lg.AddEntry(pimudif,'all')
-    lg.AddEntry(pienu, 'pi->e')
+    lg.AddEntry(pimudif,'#mu DIF')
+    lg.AddEntry(pienu, '#pi#rightarrow e')
     lg.SetFillStyle(0)
     lg.SetNColumns(2)
     plotables[0].Draw(style)
@@ -113,9 +113,9 @@ def plot_eff(
 
     plotables_rej = [
         eff_mudif,
-        eff_0_2,
-        eff_3_5,
-        eff_6_inf,
+        #eff_0_2,
+        #eff_3_5,
+        #eff_6_inf,
         eff_pienu,
     ]
     
@@ -151,11 +151,11 @@ def plot_eff(
         
     plotables_ratios = [
         r_mudif,
-        r_0_2,
-        r_3_5,
-        r_6_inf,
+        #r_0_2,
+        #r_3_5,
+        #r_6_inf,
         ]
-    
+    r_mudif.SetMaximum(500)
     plotables_ratios = sorted(
         plotables_ratios,
         key=lambda h: h.GetBinContent(h.GetMaximumBin()),
@@ -175,11 +175,11 @@ def plot_eff(
         1 - c.GetRightMargin(),
         0.53)
     lg.SetNColumns(2)
-    lg.AddEntry(pimudif_0_2, "0-1 Atar Strips")
-    lg.AddEntry(pimudif_3_5, "2-5 Atar Strips")
-    lg.AddEntry(pimudif_6_inf, "6+ Atar Strips")
-    lg.AddEntry(pimudif,'all')
-    lg.AddEntry(pienu, 'pi->e')
+    #lg.AddEntry(pimudif_0_2, "0-1 Atar Strips")
+    #lg.AddEntry(pimudif_3_5, "2-5 Atar Strips")
+    #lg.AddEntry(pimudif_6_inf, "6+ Atar Strips")
+    lg.AddEntry(pimudif,'#mu DIF')
+    lg.AddEntry(pienu, '#pi#rightarrow e')
     lg.SetFillStyle(0)
     lg.Draw('same')
     c.Update()

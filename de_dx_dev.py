@@ -12,12 +12,12 @@ import tabulate
 
 ROOT.gROOT.SetBatch(True)
 from atar.utils import geometry
-atar_geo = geometry('/Users/quentin/decay_new/default.gdml')
+atar_geo = geometry('/Users/patrick/test/mudif/default.gdml')
 
 # These should become class members
 # Fiducial Volume and Time cuts:
 
-theta_limits = [np.pi/3., 2 * np.pi / 3.]
+theta_limits = [-1, np.pi /3.]
 # theta_limits = [0., np.pi/3.]
 
 
@@ -369,19 +369,19 @@ def get(
 if __name__ == '__main__':
 
     beam50ps = ROOT.TChain("sim", "sim")
-    beam50ps.Add("/Users/quentin/decay_new/sim/beam_50ps*.root")
+    beam50ps.Add("/Users/patrick/test/mudif/sim/beam_50ps0*.root")
     print(beam50ps.GetEntries())
 
-    beam500ns = ROOT.TChain("sim", "sim")
-    beam500ns.Add("/Users/quentin/decay_new/sim/beam_500ns*.root")
-    print(beam500ns.GetEntries())
+    #beam500ns = ROOT.TChain("sim", "sim")
+    #beam500ns.Add("/Users/quentin/decay_new/sim/beam_500ns*.root")
+    #print(beam500ns.GetEntries())
 
     
     beamPienu = ROOT.TChain("sim", "sim")
-    beamPienu.Add("/Users/quentin/decay_new/sim/beam_pienu*.root")
+    beamPienu.Add("/Users/patrick/test/mudif/sim/beam_pienu0*.root")
     print(beamPienu.GetEntries())
 
-    maxEvents = 1e6
+    maxEvents = 1e9
 
     r_e_mu, f_50ps, f_500ns = get_scaling_factors()
     
