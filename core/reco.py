@@ -9,6 +9,68 @@ def get_weighted_time(pix):
 def get_ene(pix):
     return sum(pix['edep'])
 
+def get_atar_distance(a1, a2):
+    dx = abs(a1.GetX1() - a2.GetX1())
+    dy = abs(a1.GetY1() - a2.GetY1())
+    dz = abs(a1.GetZ1() - a2.GetZ1())
+    dr = ROOT.TMath.Sqrt(dx*dx + dy*dy + dz*dz)
+    return dr, dx, dy, dz
+
+def get_atar_single_hit_distance(a1):
+    if not isinstance(a1, (list, tuple)):
+        a1 = [a1]
+    dx = abs(a1[-1].GetX1() - a1[0].GetX0())
+    dy = abs(a1[-1].GetY1() - a1[0].GetY0())
+    dz = abs(a1[-1].GetZ1() - a1[0].GetZ0())
+    dr = ROOT.TMath.Sqrt(dx*dx + dy*dy + dz*dz)
+    return dr, dx, dy, dz
+
+    
+def get_truth_pion_travel(atar, verbose=False):
+    atar_pion = list(filter(lambda a: a.GetPDGID() == 211, atar))
+    merged_atar_hits = [[]]
+
+    previous_hit = atar_pion[0]
+    for hit in atar_pion:
+        if hit.GetPixelID() != previous_hit.GetPixelID():
+            merged_atar_hits.append([])
+        if abs(hit.GetTime() - previous_hit.GetTime()) > 5:
+            merged_atar_hits.append([])
+        merged_atar_hits[-1] += [hit]
+        previous_hit = hit
+
+    if len(atar_pion) == 0:
+        return -1., -1, -1
+
+    dr_last, dx_last, dy_last, dz_last= get_atar_single_hit_distance(merged_atar_hits[-1])
+    theta_last = ROOT.TVector3(dx_last, dy_last, dz_last).Theta()
+    de_last = sum(a.GetEdep() for a in merged_atar_hits[-1])
+    if len(merged_atar_hits) > 1:
+        de_previous_to_last = sum(a.GetEdep() for a in merged_atar_hits[-2])
+        dr_previous_to_last, dx_previous_to_last, dy_previous_to_last, dz_previous_to_last = get_atar_single_hit_distance(merged_atar_hits[-2])
+        theta_previous_to_last = ROOT.TVector3(
+            dx_previous_to_last, dy_previous_to_last, dz_previous_to_last).Theta()
+    else:
+        de_previous_to_last = -1.
+        dr_previous_to_last = -1
+        dz_previous_to_last = -1
+        theta_previous_to_last = -1.
+        
+    if verbose:
+        if dr_previous_to_last > 0.12:
+            print('last: {0:1.3f}, {1:1.3f}, {2:1.3f}, {3:1.3f}, {4:1.3f}'.format(
+                dr_last, dx_last, dy_last, dz_last, theta_last))
+            print('prev: {0:1.3f}, {1:1.3f}, {2:1.3f}, {3:1.3f}, {4:1.3f}'.format(
+                dr_previous_to_last, dx_previous_to_last, dy_previous_to_last, dz_previous_to_last, theta_previous_to_last))
+            print()
+    return de_last, de_previous_to_last, dr_last, dr_previous_to_last, theta_last, theta_previous_to_last
+
+def get_dx_from_de(de, last_plus_prev_to_last=False):
+    """
+    """
+    if last_plus_prev_to_last:
+        return pow(pion_ene_last_hit / 5.42, 1.73)
+    return pow(pion_ene_last_hit / 5.55, 1.71)
 
 def get_true_muon_first_pixel_dz(atar):
     for a in atar:

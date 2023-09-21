@@ -215,6 +215,7 @@ def plot_ene(
         pidar_mudif
     ]
 
+    ## compute tail fraction and contamination
     sig_low = pienu.Integral(0, pienu.FindBin(58))
     sig_high = pienu.Integral(pienu.FindBin(58), pienu.GetNbinsX()+1)
 
@@ -222,15 +223,15 @@ def plot_ene(
     bkg_high = pidar_mudif.Integral(pidar_mudif.FindBin(58), pidar_mudif.GetNbinsX()+1)
 
     tail_fraction = sig_low / sig_high if sig_high !=0 else 0.
-    contamination_high = bkg_high / (bkg_high + sig_high)
-    contamination_low = bkg_low / (bkg_low + sig_low)
+    contamination_high = bkg_high / (bkg_high + sig_high) if (bkg_high + sig_high) != 0 else 0.
+    contamination_low = bkg_low / (bkg_low + sig_low) if (bkg_low + sig_low) != 0 else 0.
     
-    if norm_strategy == 'branching_ratio':
-        if max_events != -1:
-            for h in plotables:
-                h.Scale(1. / max_events)
-                h.SetMinimum(1e-11)
-                h.GetYaxis().SetTitle('Branching Ratio')
+    # if norm_strategy == 'branching_ratio':
+    #     if max_events != -1:
+    #         for h in plotables:
+    #             h.Scale(1. / max_events)
+    #             h.SetMinimum(1e-11)
+    #             h.GetYaxis().SetTitle('Branching Ratio')
     
     
     plotables = sorted(
@@ -277,7 +278,7 @@ def plot_ene(
         c.GetLeftMargin() + 0.03,
         1 - c.GetTopMargin() - 0.15,
         'c_{{low}} = {0:1.4f}'.format(contamination_low))
-    return c, lg, plotables
+    return [c, lg, plotables]
     
 # def plot_2bin(
 #         pienu,

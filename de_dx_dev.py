@@ -6,18 +6,19 @@ import array
 from core.reco import *
 from core.variables import *
 from core.io import load, write
-from analysis.variables import VARIABLES
+from analysis.variables import VARIABLES, VARIABLES_2D
 import ROOT
 import tabulate
 
 ROOT.gROOT.SetBatch(True)
 from atar.utils import geometry
-atar_geo = geometry('/Users/patrick/test/mudif/default.gdml')
+atar_geo = geometry('/Users/quentin/decay_new/default.gdml')
 
 # These should become class members
 # Fiducial Volume and Time cuts:
 
-theta_limits = [-1, np.pi /3.]
+# theta_limits = [-1, np.pi /3.]
+theta_limits = [np.pi/3., 2 * np.pi / 3.]
 # theta_limits = [0., np.pi/3.]
 
 
@@ -134,7 +135,7 @@ def procbeam(chain, name, maxTime = 300, maxTCalo = 100, maxEvents=-1):
     nPrint = 100
     
     hist = dict()
-
+    hist_2d = dict()
     
     hist['cutflow'] = cutflow_hist(cutflow, name)
     for step in cutflow:
@@ -142,24 +143,46 @@ def procbeam(chain, name, maxTime = 300, maxTCalo = 100, maxEvents=-1):
             uuid.uuid4().hex, '', *VARIABLES['total_energy']['binning'])
         hist['total_energy_' + step].GetXaxis().SetTitle('Energy [MeV]')
         
-    
+    # 1D vars
     for _, var in VARIABLES.items():
         for _ext in [
                 '',
                 '_pimudif_0_1',
                 '_pimudif_2_5',
                 '_pimudif_6_inf']:
-            hist[var['name'] + _ext] = ROOT.TH1F(uuid.uuid4().hex, '', *var['binning'])
+            hist[var['name'] + _ext] = ROOT.TH1F(name + var['name'] + _ext, '', *var['binning'])
             hist[var['name'] + _ext].GetXaxis().SetTitle(var['title'])
             if 'unit' in var.keys():
                 hist[var['name'] + _ext].GetXaxis().SetTitle(
                     hist[var['name'] + _ext].GetXaxis().GetTitle() + ' [{}]'.format(
                         var['unit']))
         
+    # 2D vars:
+    for _, var in VARIABLES_2D.items():
+        for _ext in [
+                '',
+                '_pimudif_0_1',
+                '_pimudif_2_5',
+                '_pimudif_6_inf']:
+            hist_2d[var['name'] + _ext] = ROOT.TH2F(
+                name + var['name'] + _ext,
+                '',
+                *var['binning'])
+            hist_2d[var['name'] + _ext].GetXaxis().SetTitle(var['xlabel'])
+            hist_2d[var['name'] + _ext].GetYaxis().SetTitle(var['ylabel'])
+            if 'xunit' in var.keys():
+                hist_2d[var['name'] + _ext].GetXaxis().SetTitle(
+                    hist_2d[var['name'] + _ext].GetXaxis().GetTitle() + ' [{}]'.format(
+                        var['xunit']))
+                
+            if 'yunit' in var.keys():
+                hist_2d[var['name'] + _ext].GetYaxis().SetTitle(
+                    hist_2d[var['name'] + _ext].GetYaxis().GetTitle() + ' [{}]'.format(
+                        var['yunit']))
 
-        
-
-
+    n_tot = 0
+    n_last_012 = 0
+    n_previous_to_last_012 = 0
     for evID, event in enumerate(chain):
         if maxEvents > 0 and evID > maxEvents:
             break
@@ -182,6 +205,30 @@ def procbeam(chain, name, maxTime = 300, maxTCalo = 100, maxEvents=-1):
                 continue
         else:
             raise ValueError
+
+        de_last, de_previous_to_last, dr_last, dr_previous_to_last, theta_last, theta_previous_to_last = get_truth_pion_travel(event.atar, verbose=False)
+
+        dx_last_estimated = get_dx_from_de(de_last)
+        dx_last_plus_previous_to_last_estimated = get_dx_from_de(
+            de_last + de_previous_to_last, last_plus_prev_to_last=True)
+        dx_previous_to_last = max(dx_last_plus_previous_to_last_estimated - dx_last_estimated, 0)
+        n_tot += 1
+
+        hist['delta_dx_last'].Fill(dx_last_estimated - dr_last)
+        hist['delta_dx_previous_to_last'].Fill(dx_previous_to_last_estimated - dr_previous_to_last)
+        hist_2d['pion_ene_last_travel'].Fill(de_last, dr_last)
+        hist_2d['pion_ene_last_and_prev_travel'].Fill(de_last + de_previous_to_last, dr_last + dr_previous_to_last)
+        # hist_2d['pion_ene_previous_to_last_travel'].Fill(de_last + de_previous_to_last, dr_last + dr_previous_to_last)
+        hist_2d['pion_ene_previous_to_last_travel'].Fill(de_previous_to_last, dr_previous_to_last)
+        hist_2d['pion_ene_previous_to_last_angle'].Fill(de_previous_to_last, theta_previous_to_last)
+        # if 0.120 < dr_previous_to_last < 0.122:
+        hist_2d['pion_ene_last_previous_to_last'].Fill(de_last, de_previous_to_last)
+        hist_2d['pion_dr_last_previous_to_last'].Fill(dr_last, dr_previous_to_last)
+        hist_2d['pion_theta_last_previous_to_last'].Fill(theta_last, theta_previous_to_last)
+        if dr_last > 0.12:
+            n_last_012 += 1
+        if dr_previous_to_last > 0.12:
+            n_previous_to_last_012 += 1
         
         update_cutflow(hist, 1, step_name=cutflow[0])
 
@@ -347,20 +394,21 @@ def procbeam(chain, name, maxTime = 300, maxTCalo = 100, maxEvents=-1):
             continue
         update_cutflow(hist, 14, step_name=cutflow[13], ene=esum)
 
-    return hist
+    print (n_tot, n_last_012, n_previous_to_last_012)
+    return hist, hist_2d
 
 def get(
         chain,
         name, forceRead = True, writeHist = True, maxEvents=-1):
     hist = None
-    if not forceRead:
-        hist = load(name)
+    # if not forceRead:
+    #     hist = load(name)
         
     if not hist:
-        hist = procbeam(chain, name, maxEvents=maxEvents)
-        if writeHist:
-            write(name, hist)
-    return hist
+        hist, hist_2d = procbeam(chain, name, maxEvents=maxEvents)
+        # if writeHist:
+        #     write(name, hist)
+    return hist, hist_2d
 
 
 
@@ -369,7 +417,7 @@ def get(
 if __name__ == '__main__':
 
     beam50ps = ROOT.TChain("sim", "sim")
-    beam50ps.Add("/Users/patrick/test/mudif/sim/beam_50ps0*.root")
+    beam50ps.Add("/Users/quentin/decay_new/sim/beam_50ps*.root")
     print(beam50ps.GetEntries())
 
     #beam500ns = ROOT.TChain("sim", "sim")
@@ -378,14 +426,14 @@ if __name__ == '__main__':
 
     
     beamPienu = ROOT.TChain("sim", "sim")
-    beamPienu.Add("/Users/patrick/test/mudif/sim/beam_pienu0*.root")
+    beamPienu.Add("/Users/quentin/decay_new/sim/beam_pienu*.root")
     print(beamPienu.GetEntries())
 
-    maxEvents = 1e9
+    maxEvents = 1e6
 
     r_e_mu, f_50ps, f_500ns = get_scaling_factors()
     
-    hist50ps = get(beam50ps, "50ps", maxEvents=maxEvents)
+    hist50ps, hist_2d_50ps = get(beam50ps, "50ps", maxEvents=maxEvents)
     print(20 * '-')
     print('pi-mu-e 50ps')
     print_cutflow(hist50ps)
@@ -399,12 +447,12 @@ if __name__ == '__main__':
     # for k, v in hist500ns.items():
     #     v.Scale(f_500ns)
 
-    histPienu = get(beamPienu, "pienu", maxEvents=maxEvents)
-    print(20 * '-')
-    print('pi-e ')
-    print_cutflow(histPienu)
-    for j, v in histPienu.items():
-        v.Scale(r_e_mu)
+    # histPienu, hist2d_Pienu = get(beamPienu, "pienu", maxEvents=maxEvents)
+    # print(20 * '-')
+    # print('pi-e ')
+    # print_cutflow(histPienu)
+    # for j, v in histPienu.items():
+    #     v.Scale(r_e_mu)
 
 
 
@@ -412,64 +460,66 @@ if __name__ == '__main__':
  
     from plotting.basics import *
     
-    for _, var in VARIABLES.items():
-        c, lg = plot_stack(
-            hist50ps[var['name'] + '_pimudif_0_1'],
-            hist50ps[var['name'] + '_pimudif_2_5'],
-            hist50ps[var['name'] + '_pimudif_6_inf'],
-            hist50ps[var['name']],
-            histPienu[var['name']],
-            max_events=maxEvents)
-        c.Update()
-        c.SaveAs('plots/{}.pdf'.format(
-            var['name']))
-        c.Close()
+    # for _, var in VARIABLES.items():
+    #     c, lg = plot_stack(
+    #         hist50ps[var['name'] + '_pimudif_0_1'],
+    #         hist50ps[var['name'] + '_pimudif_2_5'],
+    #         hist50ps[var['name'] + '_pimudif_6_inf'],
+    #         hist50ps[var['name']],
+    #         histPienu[var['name']],
+    #         max_events=maxEvents)
+    #     c.Update()
+    #     c.SaveAs('plots/{}.pdf'.format(
+    #         var['name']))
+    #     c.Close()
         
-        c, lg, plotables = plot_eff(
-            hist50ps[var['name'] + '_pimudif_0_1'],
-            hist50ps[var['name'] + '_pimudif_2_5'],
-            hist50ps[var['name'] + '_pimudif_6_inf'],
-            hist50ps[var['name']],
-            histPienu[var['name']])
-        c.Update()
-        c.SaveAs('plots/eff_{}.pdf'.format(
-            var['name']))
-        c.Close()
+    #     c, lg, plotables = plot_eff(
+    #         hist50ps[var['name'] + '_pimudif_0_1'],
+    #         hist50ps[var['name'] + '_pimudif_2_5'],
+    #         hist50ps[var['name'] + '_pimudif_6_inf'],
+    #         hist50ps[var['name']],
+    #         histPienu[var['name']])
+    #     c.Update()
+    #     c.SaveAs('plots/eff_{}.pdf'.format(
+    #         var['name']))
+    #     c.Close()
 
-    for i_cut, cut in enumerate(cutflow):
-        if i_cut < 9:
-            continue
+    # for i_cut, cut in enumerate(cutflow):
+    #     if i_cut < 9:
+    #         continue
 
-        c_ene, lg, p = plot_ene(
-            histPienu['total_energy_' + cut],
-            None,
-            # hist500ns['total_energy_' + cut],
-            hist50ps['total_energy_' + cut],
-            max_events=maxEvents,
-            norm_strategy='branching_ratio')
-        c_ene.Update()
-        c_ene.SaveAs('plots/pr_plot_branching_ratio_{}.pdf'.format(cut))
-        c_ene.Close()
-
-        # c_2bin, lg = plot_2bin(
-        #     histPienu['total_energy_' + cut],
-        #     None,
-        #     # hist500ns['total_energy_' + cut],
-        #     hist50ps['total_energy_' + cut],
-        #     max_events=maxEvents,
-        #     norm_strategy='branching_ratio')
-        # c_2bin.Update()
-        # c_2bin.SaveAs('plots/twobin_plot_branching_ratio_{}.pdf'.format(cut))
-        # c_2bin.Close()
+    #     c_ene, lg, p = plot_ene(
+    #         histPienu['total_energy_' + cut],
+    #         None,
+    #         # hist500ns['total_energy_' + cut],
+    #         hist50ps['total_energy_' + cut],
+    #         max_events=maxEvents,
+    #         norm_strategy='branching_ratio')
+    #     c_ene.Update()
+    #     c_ene.SaveAs('plots/pr_plot_branching_ratio_{}.pdf'.format(cut))
+    #     c_ene.Close()
 
 
-    c_ene, lg, p = plot_ene(
-        histPienu['total_energy'],
-        None,
-        # hist500ns['total_energy'],
-        hist50ps['total_energy'],
-        max_events=maxEvents,
-        norm_strategy='branching_ratio')
-    c_ene.Update()
-    c_ene.SaveAs('plots/pr_plot_branching_ratio.pdf')
-    c_ene.Close()
+    # c_ene, lg, p = plot_ene(
+    #     histPienu['total_energy'],
+    #     None,
+    #     # hist500ns['total_energy'],
+    #     hist50ps['total_energy'],
+    #     max_events=maxEvents,
+    #     norm_strategy='branching_ratio')
+    # c_ene.Update()
+    # c_ene.SaveAs('plots/pr_plot_branching_ratio.pdf')
+    # c_ene.Close()
+
+    for k, v in VARIABLES_2D.items():
+        c_2d = ROOT.TCanvas()
+        hist_2d_50ps[k].Draw('colz')
+        c_2d.Update()
+        if k in ('pion_ene_last_and_prev_travel', 'pion_ene_last_travel'):
+            fit = ROOT.TF1('fit', 'TMath::Power(x/[0], [1])', 0, 3)
+            fit.SetParameter(0, 5.5)
+            fit.SetParameter(1, 1.7)
+            hist_2d_50ps[k].Fit(fit, 'RSV')
+            fit.Draw('same')
+        c_2d.Update()
+        c_2d.SaveAs('plots/{}.pdf'.format(v['name']))
